@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique @db.VarChar(255)
+  username  String?  @unique @db.VarChar(50)
+  fullName  String?  @map("full_name") @db.VarChar(100)
+  avatarUrl String?  @map("avatar_url") @db.Text
+
+  emailVerified Boolean @map("email_verified") @default(false)
+  isActive      Boolean @map("is_active") @default(true)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @default(now())
+
+  authProviders       AuthProvider[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model AuthProvider {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String  @db.Uuid @map("user_id")
+  providerType   String  @map("provider_type") @db.VarChar(20)
+  providerUserId String? @map("provider_user_id") @db.VarChar(255)
+  passwordHash   String? @map("password_hash")
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerType, providerUserId])
+  @@unique([userId, providerType])
+  @@index([userId], map: "idx_auth_providers_user_id")
+  @@index([providerType, providerUserId], map: "idx_auth_providers_provider")
+  @@map("auth_providers")
+}
+
+model RefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @map("created_at") @default(now())
+  revoked   Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_refresh_tokens_user_id")
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @map("created_at") @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+
