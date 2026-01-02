@@ -15,9 +15,8 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps, Postman, or same-origin)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
+    // List of exact allowed origins for local development
     const allowedOrigins = [
-      'https://modi-3d.vercel.app',
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:5173',
@@ -25,13 +24,20 @@ const corsOptions = {
       process.env.FRONTEND_URL, // Additional frontend URL from env
     ].filter(Boolean); // Remove undefined values
     
-    // Check if origin is in allowed list, or allow all in development
-    if (process.env.NODE_ENV === 'development' || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // In production, only allow listed origins
-      callback(null, true); // Change to callback(new Error('Not allowed by CORS')) to be strict
+    // Allow any origin that contains modi-3d.vercel.app
+    // This includes the main domain (https://modi-3d.vercel.app) 
+    // and any preview deployments (e.g., https://modi-3d-git-main-username.vercel.app)
+    if (origin.includes('modi-3d.vercel.app')) {
+      return callback(null, true);
     }
+    
+    // Allow localhost in development
+    if (process.env.NODE_ENV === 'development' || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Reject all other origins in production
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
