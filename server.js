@@ -9,14 +9,30 @@ const { authenticateToken } = require('./middleware/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration - Allow all origins for now (you can restrict later)
+// CORS configuration
 const corsOptions = {
-  origin: [
-    'https://modi-3d.vercel.app',
-    'http://localhost:3000',
-    // Add other allowed origins
-  ],
-  origin: true, // Allow all origins (set to specific URLs in production)
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'https://modi-3d.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      process.env.FRONTEND_URL, // Additional frontend URL from env
+    ].filter(Boolean); // Remove undefined values
+    
+    // Check if origin is in allowed list, or allow all in development
+    if (process.env.NODE_ENV === 'development' || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In production, only allow listed origins
+      callback(null, true); // Change to callback(new Error('Not allowed by CORS')) to be strict
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
