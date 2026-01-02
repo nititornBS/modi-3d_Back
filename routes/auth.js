@@ -544,10 +544,30 @@ router.post('/google', async (req, res) => {
       }
 
       // 3. Create new user and google auth_provider
-      const baseUsername = (name || email.split('@')[0])
+      // Extract name from Google payload (prefer full name, then given_name + family_name, then email)
+      let displayName = name;
+      if (!displayName) {
+        const givenName = payload.given_name || '';
+        const familyName = payload.family_name || '';
+        displayName = `${givenName} ${familyName}`.trim();
+      }
+      
+      // Generate username from Google name (or email if no name)
+      let baseUsername = displayName || email.split('@')[0];
+      
+      // Clean username: lowercase, replace spaces with underscores, remove invalid characters
+      baseUsername = baseUsername
         .toLowerCase()
-        .replace(/\s+/g, '_')
-        .substring(0, 50);
+        .replace(/\s+/g, '_')           // Replace spaces with underscores
+        .replace(/[^a-z0-9_-]/g, '')    // Remove invalid characters (keep only letters, numbers, _, -)
+        .replace(/_{2,}/g, '_')         // Replace multiple underscores with single
+        .replace(/^-+|-+$/g, '')        // Remove leading/trailing hyphens
+        .substring(0, 50);              // Limit to 50 characters
+      
+      // Ensure minimum length (if too short, use email prefix)
+      if (baseUsername.length < 3) {
+        baseUsername = email.split('@')[0].toLowerCase().substring(0, 50);
+      }
 
       // Ensure username is unique
       let uniqueUsername = baseUsername;
@@ -559,7 +579,14 @@ router.post('/google', async (req, res) => {
           select: { id: true },
         });
         if (!existing) break;
+        // Append counter to make it unique (e.g., john_doe_1, john_doe_2)
         uniqueUsername = `${baseUsername}_${counter}`;
+        // Prevent infinite loop (max 1000 attempts)
+        if (counter > 1000) {
+          // Fallback: use email prefix with timestamp
+          uniqueUsername = `${email.split('@')[0]}_${Date.now()}`.substring(0, 50);
+          break;
+        }
         counter += 1;
       }
 
@@ -567,7 +594,7 @@ router.post('/google', async (req, res) => {
         data: {
           email,
           username: uniqueUsername,
-          fullName: name || null,
+          fullName: displayName || name || null,
           avatarUrl: picture || null,
           emailVerified: true,
         },
