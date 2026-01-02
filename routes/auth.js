@@ -47,6 +47,138 @@ const createRefreshToken = async (userId, refreshToken) => {
   return expiresAt;
 };
 
+// Check username availability (GET - query parameter)
+router.get('/check-username', async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    // Validate input
+    if (!username) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username is required' 
+      });
+    }
+
+    // Trim and validate username format
+    const trimmedUsername = username.trim();
+    
+    if (trimmedUsername.length < 3) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username must be at least 3 characters long' 
+      });
+    }
+
+    if (trimmedUsername.length > 50) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username must be less than 50 characters' 
+      });
+    }
+
+    // Check if username contains only allowed characters (alphanumeric, underscore, hyphen)
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(trimmedUsername)) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username can only contain letters, numbers, underscores, and hyphens' 
+      });
+    }
+
+    // Check if username already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { username: trimmedUsername },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      return res.json({ 
+        available: false,
+        message: 'Username is already taken' 
+      });
+    }
+
+    // Username is available
+    res.json({ 
+      available: true,
+      message: 'Username is available' 
+    });
+  } catch (error) {
+    console.error('Check username error:', error);
+    res.status(500).json({ 
+      available: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// Check username availability (POST - request body)
+router.post('/check-username', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    // Validate input
+    if (!username) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username is required' 
+      });
+    }
+
+    // Trim and validate username format
+    const trimmedUsername = username.trim();
+    
+    if (trimmedUsername.length < 3) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username must be at least 3 characters long' 
+      });
+    }
+
+    if (trimmedUsername.length > 50) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username must be less than 50 characters' 
+      });
+    }
+
+    // Check if username contains only allowed characters (alphanumeric, underscore, hyphen)
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(trimmedUsername)) {
+      return res.status(400).json({ 
+        available: false,
+        error: 'Username can only contain letters, numbers, underscores, and hyphens' 
+      });
+    }
+
+    // Check if username already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { username: trimmedUsername },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      return res.json({ 
+        available: false,
+        message: 'Username is already taken' 
+      });
+    }
+
+    // Username is available
+    res.json({ 
+      available: true,
+      message: 'Username is available' 
+    });
+  } catch (error) {
+    console.error('Check username error:', error);
+    res.status(500).json({ 
+      available: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
 // Register endpoint (local provider)
 router.post('/register', async (req, res) => {
   try {
@@ -320,22 +452,35 @@ router.get('/me', async (req, res) => {
 // Google Login endpoint (google provider)
 router.post('/google', async (req, res) => {
   try {
+    console.log('Google login request received');
     const { idToken } = req.body;
 
     if (!idToken) {
+      console.log('Google login: Missing idToken');
       return res.status(400).json({ error: 'Google ID token is required' });
+    }
+
+    // Check if GOOGLE_CLIENT_ID is configured
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.error('Google login: GOOGLE_CLIENT_ID not configured');
+      return res.status(500).json({ error: 'Google OAuth not configured on server' });
     }
 
     // Verify the Google ID token
     let ticket;
     try {
+      console.log('Google login: Verifying token...');
       ticket = await client.verifyIdToken({
         idToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
+      console.log('Google login: Token verified successfully');
     } catch (error) {
-      console.error('Google token verification error:', error);
-      return res.status(401).json({ error: 'Invalid Google token' });
+      console.error('Google token verification error:', error.message);
+      return res.status(401).json({ 
+        error: 'Invalid Google token',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
 
     const payload = ticket.getPayload();
@@ -450,7 +595,12 @@ router.post('/google', async (req, res) => {
 
     const token = generateJwt(user);
 
-    res.json({
+    console.log('Google login: Success for user', user.email);
+    
+    // Ensure Content-Type is set
+    res.setHeader('Content-Type', 'application/json');
+    
+    res.status(200).json({
       message: 'Google login successful',
       token,
       refreshToken,
@@ -462,13 +612,19 @@ router.post('/google', async (req, res) => {
     });
   } catch (error) {
     console.error('Google login error:', error);
+    console.error('Error stack:', error.stack);
     
     // Ensure we always return valid JSON
     if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ 
         error: 'Internal server error',
-        message: error.message || 'An error occurred during Google login'
+        message: error.message || 'An error occurred during Google login',
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       });
+    } else {
+      // If headers already sent, log the error
+      console.error('Headers already sent, cannot send error response');
     }
   }
 });

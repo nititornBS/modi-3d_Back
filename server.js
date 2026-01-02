@@ -37,7 +37,8 @@ const corsOptions = {
     }
     
     // Reject all other origins in production
-    callback(new Error('Not allowed by CORS'));
+    console.log('CORS blocked origin:', origin);
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -52,6 +53,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
+
+// Request logging middleware (for debugging)
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+  next();
+});
+
+// Ensure all responses are JSON
+app.use((req, res, next) => {
+  // Set default Content-Type to JSON
+  res.setHeader('Content-Type', 'application/json');
+  next();
+});
 
 // Initialize database
 initDatabase()
@@ -81,10 +95,22 @@ app.get('/api/protected', authenticateToken, (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
+  console.error('Error:', err.message);
+  console.error('Error stack:', err.stack);
+  
+  // Handle CORS errors specifically
+  if (err.message && err.message.includes('CORS')) {
+    if (!res.headersSent) {
+      return res.status(403).json({ 
+        error: 'CORS policy violation',
+        message: err.message
+      });
+    }
+  }
   
   // Ensure response is always JSON
   if (!res.headersSent) {
+    res.setHeader('Content-Type', 'application/json');
     res.status(err.status || 500).json({ 
       error: err.message || 'Something went wrong!',
       ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
