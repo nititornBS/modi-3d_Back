@@ -9,7 +9,7 @@ const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // JWT expiration times
-const ACCESS_TOKEN_EXPIRY = '15m'; // Short-lived access token
+const ACCESS_TOKEN_EXPIRY = '30m'; // Short-lived access token
 const REFRESH_TOKEN_EXPIRY_DAYS = 7; // 7 days for refresh token
 
 // Helper to generate JWT (access token)
