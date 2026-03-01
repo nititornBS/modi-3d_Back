@@ -2,8 +2,11 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const path = require('path');
 const { initDatabase } = require('./config/database');
-const authRoutes = require('./routes/auth');
+const authRoutes    = require('./routes/auth');
+const mockupRoutes   = require('./routes/mockups');
+const projectRoutes  = require('./routes/projects');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
@@ -82,8 +85,17 @@ app.get('/', (req, res) => {
   res.json({ message: 'Modi 3D Backend API is running' });
 });
 
+// Serve uploaded files as static assets
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// Mockup upload routes
+app.use('/api/mockups', mockupRoutes);
+
+// Project save/load routes
+app.use('/api/projects', projectRoutes);
 
 // Protected route example
 app.get('/api/protected', authenticateToken, (req, res) => {

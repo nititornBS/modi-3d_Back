@@ -23,6 +23,8 @@ model User {
   authProviders       AuthProvider[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  userBackgrounds     UserBackground[]
+  projects            Project[]
 
   @@map("users")
 }
@@ -73,4 +75,38 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model Project {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @db.Uuid @map("user_id")
+  name        String   @db.Text
+  templateId  String?  @map("template_id") @db.Text
+  bgUrl       String?  @map("bg_url") @db.Text
+  designsJson String   @map("designs_json") @db.Text  // JSON array of design layers
+  thumbnail   String?  @db.Text                        // Cloudinary URL of preview image
 
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_projects_user_id")
+  @@map("projects")
+}
+
+model UserBackground {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String @db.Uuid @map("user_id")
+  name     String @db.Text
+  filename String @db.Text
+  mimetype String @db.VarChar(100)
+  size     Int
+  url      String @db.Text
+  category String @default("custom") @db.VarChar(50)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_backgrounds_user_id")
+  @@map("user_backgrounds")
+}
