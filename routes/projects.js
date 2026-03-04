@@ -116,10 +116,18 @@ router.post('/', authenticateToken, async (req, res) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     await ensureUserExists(req.user);
-    const projects = await prisma.project.findMany({
+    const rows = await prisma.project.findMany({
       where:   { userId: req.user.userId },
       orderBy: { updatedAt: 'desc' },
-      select:  { id: true, name: true, templateId: true, bgUrl: true, thumbnail: true, createdAt: true, updatedAt: true },
+      select:  { id: true, name: true, templateId: true, bgUrl: true, thumbnail: true, createdAt: true, updatedAt: true, designsJson: true },
+    });
+    const projects = rows.map(({ designsJson, ...p }) => {
+      let projectType = '2d';
+      try {
+        const d = JSON.parse(designsJson);
+        if (d && d.projectType === '3d') projectType = '3d';
+      } catch {}
+      return { ...p, projectType };
     });
     res.json({ projects });
   } catch (error) {
